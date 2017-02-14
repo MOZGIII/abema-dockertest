@@ -157,7 +157,7 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
 }
 
 // Wait is an exponential backoff retry. It waits until check function returns non error.
-func (c *Container) Wait(maxInterval, maxWait time.Duration, check func() error) {
+func (c *Container) Wait(maxInterval, maxWait time.Duration, check func() error) error {
 	if maxWait == 0 {
 		maxWait = time.Minute
 	}
