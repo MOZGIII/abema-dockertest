@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cenk/backoff"
 )
 
 var (
@@ -71,13 +73,19 @@ func RunEnvs(image string, envs map[string]string, args ...string) *Container {
 	return c
 }
 
-// Close docker containerg.
+// Close docker container.
 func (c *Container) Close() {
 	// ignore errors on stop, wait and remove
 	run("docker", "stop", c.containerID)
 	// wait until docker stops
 	run("docker", "wait", c.containerID)
 	// remove the container
+	run("docker", "rm", c.containerID)
+}
+
+// Kill and remove container.
+func (c *Container) KillRemove() {
+	run("docker", "kill", c.containerID)
 	run("docker", "rm", c.containerID)
 }
 
@@ -146,6 +154,17 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
 		break
 	}
 	return p
+}
+
+// Wait is an exponential backoff retry. It waits until check function returns non error.
+func (c *Container) Wait(maxInterval, maxWait time.Duration, check func() error) {
+	if maxWait == 0 {
+		maxWait = time.Minute
+	}
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxInterval = maxInterval
+	bo.MaxElapsedTime = maxWait
+	return backoff.Retry(check, bo)
 }
 
 // Port returns exposed port in docker host.
