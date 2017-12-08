@@ -31,7 +31,7 @@ func TestParsePorts(t *testing.T) {
 
 func TestRun(t *testing.T) {
 
-	con := Run("redis")
+	con, _ := Run("redis")
 	defer con.Close()
 
 	require.Equal(t, "127.0.0.1", con.Host())
@@ -45,30 +45,30 @@ func TestRun(t *testing.T) {
 
 func TestWaitPort(t *testing.T) {
 
-	con := Run("redis")
+	con, _ := Run("redis")
 	defer con.Close()
 
-	p := con.WaitPort(6379, 1*time.Second)
+	p, _ := con.WaitPort(6379, 1*time.Second)
 	require.NotZero(t, p)
 
 }
 
 func TestWaitHTTP(t *testing.T) {
 
-	con := Run("nginx")
+	con, _ := Run("nginx")
 	defer con.Close()
 
-	p := con.WaitHTTP(80, "/", 1*time.Second)
+	p, _ := con.WaitHTTP(80, "/", 1*time.Second)
 	require.NotZero(t, p)
 
 }
 
 func TestRunEnvs(t *testing.T) {
 
-	con := RunEnvs("mysql", map[string]string{"MYSQL_ROOT_PASSWORD": "test"})
+	con, _ := RunEnvs("mysql", map[string]string{"MYSQL_ROOT_PASSWORD": "test"})
 	defer con.Close()
 
-	p := con.WaitPort(3306, 1*time.Second)
+	p, _ := con.WaitPort(3306, 1*time.Second)
 	require.NotZero(t, p)
 
 }
