@@ -74,19 +74,24 @@ func RunEnvs(image string, envs map[string]string, args ...string) (*Container, 
 }
 
 // Close docker container.
-func (c *Container) Close() {
-	// ignore errors on stop, wait and remove
-	run("docker", "stop", c.containerID)
-	// wait until docker stops
-	run("docker", "wait", c.containerID)
+func (c *Container) Close() error {
+	if _, err := run("docker", "stop", c.containerID); err != nil {
+		return err
+	}
+	// wait until docker stops ignoring the errors
+	run("docker", "wait", c.containerID) // nolint: errcheck
 	// remove the container
-	run("docker", "rm", c.containerID)
+	_, err := run("docker", "rm", c.containerID)
+	return err
 }
 
-// Kill and remove container.
-func (c *Container) KillRemove() {
-	run("docker", "kill", c.containerID)
-	run("docker", "rm", c.containerID)
+// KillRemove kills and removes container.
+func (c *Container) KillRemove() error {
+	if _, err := run("docker", "kill", c.containerID); err != nil {
+		return err
+	}
+	_, err := run("docker", "rm", c.containerID)
+	return err
 }
 
 // Host returns host IP which runs docker.
