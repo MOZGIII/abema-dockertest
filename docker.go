@@ -147,7 +147,7 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) (int,
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		defer res.Body.Close()
+		defer res.Body.Close() // nolint: errcheck
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
 			if time.Now().After(end) {
 				return 0, fmt.Errorf("http has not valid status code on port %d for %s code:%d", port, c.image, res.StatusCode)
