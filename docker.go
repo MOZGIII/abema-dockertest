@@ -3,7 +3,7 @@ package dockertest
 import (
 	"bytes"
 	"errors"
-	"log"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -30,12 +30,12 @@ type Container struct {
 }
 
 // Run image and returns docker container.
-func Run(image string, args ...string) *Container {
+func Run(image string, args ...string) (*Container, error) {
 	return RunEnvs(image, nil, args...)
 }
 
 // RunEnvs image with environment variables and returns docker container.
-func RunEnvs(image string, envs map[string]string, args ...string) *Container {
+func RunEnvs(image string, envs map[string]string, args ...string) (*Container, error) {
 	cmdargs := []string{"run", "-P", "-d"}
 
 	// append environment variables
@@ -48,13 +48,13 @@ func RunEnvs(image string, envs map[string]string, args ...string) *Container {
 	// run and get containerID
 	containerID, err := run("docker", cmdargs...)
 	if err != nil {
-		log.Fatalf("failed run docker image:%s args:%v", image, args)
+		return nil, fmt.Errorf("failed run docker image:%s args:%v", image, args)
 	}
 
 	// get port map
 	ports, err := run("docker", "port", containerID)
 	if err != nil {
-		log.Fatalf("failed get ports image:%s", image)
+		return nil, fmt.Errorf("failed get ports image:%s", image)
 	}
 
 	host := "127.0.0.1"
@@ -70,7 +70,7 @@ func RunEnvs(image string, envs map[string]string, args ...string) *Container {
 		host:        host,
 	}
 	c.parsePorts(ports)
-	return c
+	return c, nil
 }
 
 // Close docker container.
@@ -95,16 +95,16 @@ func (c *Container) Host() string {
 }
 
 // WaitPort waits until port available.
-func (c *Container) WaitPort(port int, timeout time.Duration) int {
+func (c *Container) WaitPort(port int, timeout time.Duration) (int, error) {
 	// wait until port available
 	p := c.ports[port]
 	if p == 0 {
-		log.Fatalf("port %d is not exposed on %s", port, c.image)
+		return 0, fmt.Errorf("port %d is not exposed on %s", port, c.image)
 	}
 
 	nw := c.networks[port]
 	if nw == "" {
-		log.Fatalf("network not described on %s", c.image)
+		return 0, fmt.Errorf("network not described on %s", c.image)
 	}
 
 	end := time.Now().Add(timeout)
@@ -113,21 +113,21 @@ func (c *Container) WaitPort(port int, timeout time.Duration) int {
 		_, err := net.DialTimeout(nw, c.Addr(port), end.Sub(now))
 		if err != nil {
 			if time.Now().After(end) {
-				log.Fatalf("port %d not available on %s for %f seconds", port, c.image, timeout.Seconds())
+				return 0, fmt.Errorf("port %d not available on %s for %f seconds", port, c.image, timeout.Seconds())
 			}
 			time.Sleep(time.Second)
 			continue
 		}
 		break
 	}
-	return p
+	return p, nil
 }
 
 // WaitHTTP waits until http available
-func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
+func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) (int, error) {
 	p := c.ports[port]
 	if p == 0 {
-		log.Fatalf("port %d is not exposed on %s", port, c.image)
+		return 0, fmt.Errorf("port %d is not exposed on %s", port, c.image)
 	}
 	now := time.Now()
 	end := now.Add(timeout)
@@ -136,7 +136,7 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
 		res, err := cli.Get("http://" + c.Addr(port) + path)
 		if err != nil {
 			if time.Now().After(end) {
-				log.Fatalf("http not available on port %d for %s err:%v", port, c.image, err)
+				return 0, fmt.Errorf("http not available on port %d for %s err:%v", port, c.image, err)
 			}
 			// sleep 1 sec to retry
 			time.Sleep(1 * time.Second)
@@ -145,7 +145,7 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
 		defer res.Body.Close()
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
 			if time.Now().After(end) {
-				log.Fatalf("http has not valid status code on port %d for %s code:%d", port, c.image, res.StatusCode)
+				return 0, fmt.Errorf("http has not valid status code on port %d for %s code:%d", port, c.image, res.StatusCode)
 			}
 			// sleep 1 sec to retry
 			time.Sleep(1 * time.Second)
@@ -153,7 +153,7 @@ func (c *Container) WaitHTTP(port int, path string, timeout time.Duration) int {
 		}
 		break
 	}
-	return p
+	return p, nil
 }
 
 // Wait is an exponential backoff retry. It waits until check function returns non error.
